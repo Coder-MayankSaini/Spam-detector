@@ -8,7 +8,7 @@ from sklearn.pipeline import make_pipeline
 import pandas as pd
 
 app = Flask(__name__)
-CORS(app)  # Allow React to connect
+CORS(app)  
 
 # Initialize database
 def init_db():
@@ -24,7 +24,6 @@ def get_model():
     try:
         return joblib.load('spam_model.joblib')
     except:
-        # Simple training data (replace with real dataset)
         df = pd.DataFrame({
             'text': [
                 "Win a free iPhone now!", 
@@ -32,7 +31,7 @@ def get_model():
                 "Limited time offer!", 
                 "Your account statement"
             ],
-            'label': [1, 0, 1, 0]  # 1=spam
+            'label': [1, 0, 1, 0] 
         })
         model = make_pipeline(TfidfVectorizer(), MultinomialNB())
         model.fit(df['text'], df['label'])
@@ -42,19 +41,17 @@ def get_model():
 model = get_model()
 init_db()
 
-# API Routes
 @app.route('/analyze', methods=['POST'])
 @app.route('/analyze', methods=['POST'])
 def analyze():
     email_text = request.json.get('emailText', '')
     proba = model.predict_proba([email_text])[0]
-    is_spam = bool(proba[1] > 0.6)  # Explicitly convert to Python bool
+    is_spam = bool(proba[1] > 0.6)  
     
-    # Convert everything to native Python types (JSON-safe)
     return jsonify({
-        "is_spam": is_spam,  # Now a bool (Flask handles this)
-        "confidence": float(proba[1]),  # Convert numpy float to Python float
-        "keywords": ["free", "win"] if is_spam else []  # List is JSON-safe
+        "is_spam": is_spam,  
+        "confidence": float(proba[1]),  
+        "keywords": ["free", "win"] if is_spam else []  
     })
 
 @app.route('/history', methods=['GET'])
