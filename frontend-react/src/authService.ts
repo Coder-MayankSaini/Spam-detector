@@ -20,7 +20,7 @@ interface RegisterRequest {
 }
 
 class AuthService {
-  private baseUrl = 'http://localhost:5000';
+  private baseUrl = 'http://localhost:5001';
   private tokenKey = 'spam_detector_token';
 
   async register(data: RegisterRequest): Promise<AuthResponse> {
@@ -59,6 +59,40 @@ class AuthService {
     const result = await response.json();
     this.setToken(result.access_token);
     return result;
+  }
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const response = await fetch(`${this.baseUrl}/forgot-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to send reset email');
+    }
+
+    return response.json();
+  }
+
+  async resetPassword(token: string, password: string): Promise<{ message: string }> {
+    const response = await fetch(`${this.baseUrl}/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ token, password }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to reset password');
+    }
+
+    return response.json();
   }
 
   async verifyToken(): Promise<{ valid: boolean; user?: User }> {

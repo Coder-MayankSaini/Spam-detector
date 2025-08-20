@@ -1,16 +1,31 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthContext';
+import { ForgotPassword } from './ForgotPassword';
+import { ResetPassword } from './ResetPassword';
 import './Auth.css';
+
+type AuthView = 'login' | 'register' | 'forgot-password' | 'reset-password';
 
 export const AuthComponent: React.FC = () => {
   const { login, register } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
+  const [currentView, setCurrentView] = useState<AuthView>('login');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resetToken, setResetToken] = useState<string>('');
+
+  // Check for reset token in URL on component mount
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    if (token) {
+      setResetToken(token);
+      setCurrentView('reset-password');
+    }
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -26,9 +41,9 @@ export const AuthComponent: React.FC = () => {
     setError('');
 
     try {
-      if (isLogin) {
+      if (currentView === 'login') {
         await login(formData.email, formData.password);
-      } else {
+      } else if (currentView === 'register') {
         await register(formData.email, formData.password);
       }
       // The AuthContext will automatically trigger a re-render when authentication state changes
@@ -38,6 +53,26 @@ export const AuthComponent: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const handleBackToAuth = () => {
+    setCurrentView('login');
+    setError('');
+    setFormData({ email: '', password: '' });
+    // Clear URL parameters
+    window.history.replaceState({}, document.title, window.location.pathname);
+  };
+
+  // Show forgot password component
+  if (currentView === 'forgot-password') {
+    return <ForgotPassword onBackToAuth={handleBackToAuth} />;
+  }
+
+  // Show reset password component
+  if (currentView === 'reset-password') {
+    return <ResetPassword token={resetToken} onBackToAuth={handleBackToAuth} />;
+  }
+
+  const isLogin = currentView === 'login';
 
   return (
     <div className="auth-container">
@@ -51,7 +86,7 @@ export const AuthComponent: React.FC = () => {
           <button
             className={`auth-tab ${isLogin ? 'active' : ''}`}
             onClick={() => {
-              setIsLogin(true);
+              setCurrentView('login');
               setError('');
               setFormData({ email: '', password: '' });
             }}
@@ -61,7 +96,7 @@ export const AuthComponent: React.FC = () => {
           <button
             className={`auth-tab ${!isLogin ? 'active' : ''}`}
             onClick={() => {
-              setIsLogin(false);
+              setCurrentView('register');
               setError('');
               setFormData({ email: '', password: '' });
             }}
@@ -116,6 +151,18 @@ export const AuthComponent: React.FC = () => {
               isLogin ? 'Sign In' : 'Create Account'
             )}
           </button>
+
+          {isLogin && (
+            <div className="forgot-password-link">
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => setCurrentView('forgot-password')}
+              >
+                Forgot your password?
+              </button>
+            </div>
+          )}
         </form>
 
         <div className="auth-footer">
@@ -125,7 +172,7 @@ export const AuthComponent: React.FC = () => {
               type="button"
               className="auth-switch"
               onClick={() => {
-                setIsLogin(!isLogin);
+                setCurrentView(isLogin ? 'register' : 'login');
                 setError('');
                 setFormData({ email: '', password: '' });
               }}

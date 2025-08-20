@@ -1,7 +1,7 @@
 import { EmailAnalysis, HistoryItem, Stats, TrainingItem } from './types';
 import { authService } from './authService';
 
-const API_BASE = 'http://localhost:5000';
+const API_BASE = 'http://localhost:5001';
 
 class ApiService {
   async analyzeEmail(emailText: string): Promise<EmailAnalysis> {
@@ -103,6 +103,61 @@ class ApiService {
       }
       const error = await response.json();
       throw new Error(error.error || 'Retraining failed');
+    }
+    
+    return response.json();
+  }
+
+  async submitContactForm(formData: { name: string; email: string; subject: string; message: string }): Promise<any> {
+    const response = await fetch(`${API_BASE}/contact`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: formData.name,
+        email: formData.email,
+        message: `Subject: ${formData.subject}\n\n${formData.message}`
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to send message');
+    }
+    
+    return response.json();
+  }
+
+  async forgotPassword(email: string): Promise<any> {
+    const response = await fetch(`${API_BASE}/forgot-password`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to send reset email');
+    }
+    
+    return response.json();
+  }
+
+  async resetPassword(token: string, password: string): Promise<any> {
+    const response = await fetch(`${API_BASE}/reset-password`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ token, password })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to reset password');
     }
     
     return response.json();

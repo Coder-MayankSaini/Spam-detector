@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { apiService } from '../apiService';
 import './ContactPage.css';
 
 interface ContactForm {
@@ -48,16 +49,13 @@ export const ContactPage: React.FC = () => {
     }
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Here you would typically send the form data to your backend
-      console.log('Contact form submitted:', formData);
+      // Send form data to backend API
+      await apiService.submitContactForm(formData);
       
       setIsSubmitted(true);
       setFormData({ name: '', email: '', subject: '', message: '' });
     } catch (err) {
-      setError('Failed to send message. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to send message. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

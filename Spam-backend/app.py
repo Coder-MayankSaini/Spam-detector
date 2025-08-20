@@ -23,12 +23,23 @@ import pytesseract
 import cv2
 import re
 import bcrypt
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import secrets
+import hashlib
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+
+# Enhanced CORS Configuration for authentication
+CORS(app, 
+     origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 # JWT Configuration
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
@@ -39,7 +50,7 @@ jwt = JWTManager(app)
 class Config:
     DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
     HOST = os.getenv('HOST', '127.0.0.1')
-    PORT = int(os.getenv('PORT', 5000))
+    PORT = int(os.getenv('PORT', 5001))
     DATABASE_URL = os.getenv('DATABASE_URL', 'emails.db')
     MODEL_PATH = os.getenv('MODEL_PATH', 'spam_model.joblib')
     DEFAULT_THRESHOLD = float(os.getenv('DEFAULT_THRESHOLD', 0.6))
@@ -48,6 +59,11 @@ class Config:
     TESSERACT_CMD = os.getenv('TESSERACT_CMD', None)
 
 config = Config()
+
+# Email configuration
+GMAIL_USER = os.getenv('GMAIL_USER')
+GMAIL_PASS = os.getenv('GMAIL_PASS')
+CONTACT_RECEIVER = 'marketing.nexoradigital@gmail.com'
 
 # Configure Tesseract path if specified
 if config.TESSERACT_CMD:
@@ -116,6 +132,16 @@ def init_db():
                  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                  FOREIGN KEY (user_id) REFERENCES users (id))''')
     
+    # Create password_resets table
+    conn.execute('''CREATE TABLE IF NOT EXISTS password_resets
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 user_id INTEGER NOT NULL,
+                 token TEXT UNIQUE NOT NULL,
+                 expires_at DATETIME NOT NULL,
+                 used BOOLEAN DEFAULT FALSE,
+                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                 FOREIGN KEY (user_id) REFERENCES users (id))''')
+    
     conn.close()
     log_structured('INFO', 'database_initialized', database=config.DATABASE_URL)
 
@@ -151,6 +177,213 @@ def create_user(email, password):
         return user_id
     except sqlite3.IntegrityError:
         return None  # User already exists
+
+def generate_reset_token():
+    """Generate a secure random token for password reset"""
+    return secrets.token_urlsafe(32)
+
+def create_reset_token(user_id):
+    """Create a password reset token for a user"""
+    token = generate_reset_token()
+    # Token expires in 1 hour
+    expires_at = datetime.now() + timedelta(hours=1)
+    
+    try:
+        conn = sqlite3.connect(config.DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO password_resets (user_id, token, expires_at) 
+            VALUES (?, ?, ?)
+        """, (user_id, token, expires_at))
+        conn.commit()
+        conn.close()
+        return token
+    except Exception as e:
+        log_structured('ERROR', 'reset_token_creation_failed', error=str(e))
+        return None
+
+def verify_reset_token(token):
+    """Verify a password reset token and return user_id if valid"""
+    try:
+        conn = sqlite3.connect(config.DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT user_id FROM password_resets 
+            WHERE token = ? AND expires_at > datetime('now') AND used = FALSE
+        """, (token,))
+        result = cursor.fetchone()
+        conn.close()
+        return result[0] if result else None
+    except Exception as e:
+        log_structured('ERROR', 'reset_token_verification_failed', error=str(e))
+        return None
+
+def mark_reset_token_used(token):
+    """Mark a reset token as used"""
+    try:
+        conn = sqlite3.connect(config.DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE password_resets SET used = TRUE WHERE token = ?", (token,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        log_structured('ERROR', 'reset_token_marking_failed', error=str(e))
+        return False
+
+def update_user_password(user_id, new_password):
+    """Update a user's password"""
+    password_hash = hash_password(new_password)
+    try:
+        conn = sqlite3.connect(config.DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", 
+                      (password_hash, user_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        log_structured('ERROR', 'password_update_failed', error=str(e))
+        return False
+
+def send_password_reset_email(email, reset_token):
+    """Send password reset email to user with beautiful HTML template"""
+    if not GMAIL_USER or not GMAIL_PASS:
+        log_structured('ERROR', 'gmail_credentials_missing_for_reset')
+        return False
+
+    # Create reset link - you can customize this URL
+    reset_link = f"http://localhost:3000/reset-password?token={reset_token}"
+    
+    subject = "🔐 Password Reset Request - Spam Detector"
+    
+    # Create beautiful HTML email template
+    html_body = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Reset - Spam Detector</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Arial', 'Helvetica', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh;">
+    <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); overflow: hidden; margin-top: 40px; margin-bottom: 40px;">
+        
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+            <div style="background: white; border-radius: 50%; width: 80px; height: 80px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
+                <span style="font-size: 36px; color: #667eea;">🛡️</span>
+            </div>
+            <h1 style="margin: 0; color: white; font-size: 28px; font-weight: 700;">Spam Detector</h1>
+            <p style="margin: 10px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">Secure Email Protection</p>
+        </div>
+        
+        <!-- Main Content -->
+        <div style="padding: 50px 40px;">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <h2 style="color: #2c3e50; font-size: 24px; margin: 0 0 15px; font-weight: 600;">Password Reset Request</h2>
+                <div style="width: 60px; height: 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin: 0 auto; border-radius: 2px;"></div>
+            </div>
+            
+            <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 0 0 25px;">Hello there,</p>
+            <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 0 0 30px;">
+                We received a request to reset your password for your <strong>Spam Detector</strong> account. 
+                If you made this request, click the button below to set a new password.
+            </p>
+            
+            <!-- Reset Button -->
+            <div style="text-align: center; margin: 40px 0;">
+                <a href="{reset_link}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 50px; font-weight: 600; font-size: 16px; box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3); transition: all 0.3s ease;">
+                    🔐 Reset My Password
+                </a>
+            </div>
+            
+            <!-- Security Info -->
+            <div style="background: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; border-radius: 0 10px 10px 0; margin: 30px 0;">
+                <h3 style="color: #2c3e50; font-size: 16px; margin: 0 0 10px; font-weight: 600;">
+                    🔒 Security Information
+                </h3>
+                <ul style="color: #666; font-size: 14px; margin: 0; padding-left: 20px; line-height: 1.5;">
+                    <li>This link will expire in <strong>1 hour</strong></li>
+                    <li>This link can only be used once</li>
+                    <li>If you didn't request this, you can safely ignore this email</li>
+                </ul>
+            </div>
+            
+            <!-- Alternative Link -->
+            <div style="border: 2px dashed #e0e6ed; border-radius: 10px; padding: 20px; margin: 30px 0; background: #fafbfc;">
+                <p style="color: #666; font-size: 14px; margin: 0 0 10px; font-weight: 600;">
+                    Button not working? Copy and paste this link:
+                </p>
+                <p style="word-break: break-all; color: #667eea; font-size: 13px; margin: 0; font-family: monospace;">
+                    {reset_link}
+                </p>
+            </div>
+            
+            <p style="color: #666; font-size: 14px; line-height: 1.5; margin: 30px 0 0;">
+                If you have any questions or need help, please don't hesitate to contact our support team.
+            </p>
+        </div>
+        
+        <!-- Footer -->
+        <div style="background: #2c3e50; padding: 30px 40px; text-align: center;">
+            <p style="color: #95a5a6; font-size: 14px; margin: 0 0 15px;">
+                This email was sent by <strong style="color: #ecf0f1;">Spam Detector</strong>
+            </p>
+            <p style="color: #7f8c8d; font-size: 12px; margin: 0;">
+                🛡️ Protecting your inbox with advanced AI detection
+            </p>
+            <div style="margin: 20px 0 0; padding: 15px 0; border-top: 1px solid #34495e;">
+                <span style="color: #7f8c8d; font-size: 11px;">
+                    © 2025 Spam Detector. All rights reserved.
+                </span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+    # Fallback plain text version
+    text_body = f"""
+Hello,
+
+You have requested to reset your password for your Spam Detector account.
+
+Click the link below to reset your password:
+{reset_link}
+
+This link will expire in 1 hour for security reasons.
+
+If you did not request this password reset, please ignore this email.
+
+Best regards,
+Spam Detector Team
+"""
+    
+    msg = MIMEMultipart('alternative')
+    msg['From'] = GMAIL_USER
+    msg['To'] = email
+    msg['Subject'] = subject
+    
+    # Add both plain text and HTML versions
+    text_part = MIMEText(text_body, 'plain')
+    html_part = MIMEText(html_body, 'html')
+    
+    msg.attach(text_part)
+    msg.attach(html_part)
+
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(GMAIL_USER, GMAIL_PASS)
+            server.sendmail(GMAIL_USER, email, msg.as_string())
+        
+        log_structured('INFO', 'password_reset_email_sent', email=email)
+        return True
+    except Exception as e:
+        log_structured('ERROR', 'password_reset_email_failed', error=str(e))
+        return False
 
 def load_training_data():
     """Load training data from CSV with validation"""
@@ -498,6 +731,84 @@ def verify_token():
         "user": {"id": user_id, "email": user[0]}
     }), 200
 
+@app.route('/forgot-password', methods=['POST'])
+@log_requests
+def forgot_password():
+    data = request.get_json(silent=True) or {}
+    email = data.get('email', '').strip().lower()
+    
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+    
+    # Validate email format
+    import re
+    email_regex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+    if not re.match(email_regex, email):
+        return jsonify({"error": "Please enter a valid email address"}), 400
+    
+    # Get user by email
+    user = get_user_by_email(email)
+    if not user:
+        # Don't reveal if email exists or not for security
+        return jsonify({
+            "message": "If an account with that email exists, a password reset link has been sent."
+        }), 200
+    
+    user_id = user[0]
+    
+    # Create reset token
+    reset_token = create_reset_token(user_id)
+    if not reset_token:
+        return jsonify({"error": "Failed to create reset token"}), 500
+    
+    # Send reset email
+    if send_password_reset_email(email, reset_token):
+        log_structured('INFO', 'password_reset_requested', user_id=user_id, email=email)
+        return jsonify({
+            "message": "If an account with that email exists, a password reset link has been sent."
+        }), 200
+    else:
+        return jsonify({"error": "Failed to send reset email"}), 500
+
+@app.route('/reset-password', methods=['POST'])
+@log_requests
+def reset_password():
+    data = request.get_json(silent=True) or {}
+    token = data.get('token', '').strip()
+    new_password = data.get('password', '').strip()
+    
+    if not token or not new_password:
+        return jsonify({"error": "Token and new password are required"}), 400
+    
+    if len(new_password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+    
+    # Verify reset token
+    user_id = verify_reset_token(token)
+    if not user_id:
+        return jsonify({"error": "Invalid or expired reset token"}), 400
+    
+    # Update password
+    if not update_user_password(user_id, new_password):
+        return jsonify({"error": "Failed to update password"}), 500
+    
+    # Mark token as used
+    mark_reset_token_used(token)
+    
+    log_structured('INFO', 'password_reset_completed', user_id=user_id)
+    return jsonify({"message": "Password has been reset successfully"}), 200
+
+# Health check endpoint
+@app.route('/', methods=['GET'])
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        "status": "healthy",
+        "message": "Spam Detector API is running",
+        "timestamp": datetime.now().isoformat(),
+        "version": "1.0.0"
+    }), 200
+
 @app.route('/analyze', methods=['POST'])
 @jwt_required()
 @log_requests
@@ -738,9 +1049,74 @@ def get_stats():
         log_structured('ERROR', 'stats_fetch_failed', error=str(e))
         return jsonify({"error": "Failed to fetch statistics"}), 500
 
+@app.route('/contact', methods=['POST'])
+@log_requests
+def contact():
+    data = request.get_json(silent=True) or {}
+    name = data.get('name', '').strip()
+    email = data.get('email', '').strip()
+    message = data.get('message', '').strip()
+    
+    if not name or not email or not message:
+        return jsonify({'error': 'Name, email, and message are required.'}), 400
+
+    # Validate email format
+    import re
+    email_regex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+    if not re.match(email_regex, email):
+        return jsonify({'error': 'Please enter a valid email address.'}), 400
+
+    # Check if Gmail credentials are configured
+    if not GMAIL_USER or not GMAIL_PASS:
+        log_structured('ERROR', 'gmail_credentials_missing')
+        return jsonify({'error': 'Email service is not configured.'}), 500
+
+    # Compose email
+    subject = f"Contact Form Submission from {name}"
+    body = f"Name: {name}\nEmail: {email}\n\nMessage:\n{message}"
+    
+    msg = MIMEMultipart()
+    msg['From'] = GMAIL_USER
+    msg['To'] = CONTACT_RECEIVER
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(GMAIL_USER, GMAIL_PASS)
+            server.sendmail(GMAIL_USER, CONTACT_RECEIVER, msg.as_string())
+        
+        log_structured('INFO', 'contact_email_sent', 
+                     sender_name=name, sender_email=email)
+        return jsonify({'message': 'Contact form submitted successfully. We will get back to you soon!'}), 200
+    except Exception as e:
+        log_structured('ERROR', 'contact_email_failed', error=str(e))
+        return jsonify({'error': 'Failed to send email. Please try again later.'}), 500
+
 if __name__ == '__main__':
+    import platform
+    is_windows = platform.system().lower() == 'windows'
+    
     log_structured('INFO', 'application_starting', 
                  host=config.HOST, 
                  port=config.PORT, 
-                 debug=config.DEBUG)
-    app.run(debug=config.DEBUG, host=config.HOST, port=config.PORT)
+                 debug=config.DEBUG,
+                 platform=platform.system())
+    
+    if is_windows:
+        # Windows-specific recommendations
+        print("🪟 Windows detected - For better stability, consider using:")
+        print("   python start_server.py")
+        print("   or")
+        print("   start_server.bat")
+        print("")
+    
+    # Use Windows-optimized settings
+    app.run(
+        debug=config.DEBUG, 
+        host=config.HOST, 
+        port=config.PORT,
+        threaded=True,  # Enable threading for better Windows compatibility
+        use_reloader=False if is_windows else True  # Disable reloader on Windows to prevent crashes
+    )
