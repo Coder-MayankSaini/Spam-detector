@@ -593,6 +593,26 @@ def login():
         logger.error(f"Login error: {e}")
         return jsonify({'error': 'Login failed'}), 500
 
+@app.route('/verify-token', methods=['GET'])
+@jwt_required()
+def verify_token():
+    """Verify JWT token and return user info"""
+    try:
+        user_id = get_jwt_identity()
+        user = db_manager.get_user_by_id(user_id)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        return jsonify({
+            'valid': True,
+            'user': {'id': user['id'], 'email': user['email']}
+        })
+        
+    except Exception as e:
+        logger.error(f"Token verification error: {e}")
+        return jsonify({'error': 'Token verification failed'}), 500
+
 @app.route('/analyze', methods=['POST'])
 @jwt_required()
 @rate_limit(max_requests=100, window=60)

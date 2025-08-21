@@ -119,6 +119,17 @@ class DatabaseManager:
             logger.error(f"Error getting user by email: {e}")
             return None
 
+    def get_user_by_id(self, user_id):
+        """Get user by ID"""
+        try:
+            with self.get_db_connection() as conn:
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+                cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+                return cursor.fetchone()
+        except Exception as e:
+            logger.error(f"Error getting user by ID: {e}")
+            return None
+
     def create_user(self, email, password_hash):
         """Create a new user"""
         try:
