@@ -1,22 +1,11 @@
-# Railway Configuration
-# This file tells Railway how to build and deploy your app
-
 [build]
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "gunicorn app_postgresql:app --bind 0.0.0.0:$PORT --workers 2"
+startCommand = "gunicorn app:app --bind 0.0.0.0:$PORT --workers 2"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
-[env]
-# These will be set in Railway dashboard
-# JWT_SECRET_KEY = "your-secret-key"
-# EMAIL_HOST = "smtp.gmail.com" 
-# EMAIL_PORT = "587"
-# EMAIL_USER = "your-email@gmail.com"
-# EMAIL_PASSWORD = "your-app-password"
-# EMAIL_FROM = "your-email@gmail.com"
-# CORS_ORIGINS = "https://your-app.vercel.app"
-# DEBUG = "false"
-# DATABASE_URL is automatically provided by Railway PostgreSQL service
+[healthcheck]
+path = "/health"
+port = "$PORT"
