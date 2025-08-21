@@ -22,14 +22,14 @@ interface ThemeProviderProps {
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('spam-detector-theme');
+    const saved = localStorage.getItem('spamwall-theme');
     return (saved as Theme) || 'dark';
   });
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
-    localStorage.setItem('spam-detector-theme', newTheme);
+    localStorage.setItem('spamwall-theme', newTheme);
   };
 
   useEffect(() => {

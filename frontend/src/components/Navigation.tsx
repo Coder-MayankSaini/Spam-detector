@@ -29,7 +29,7 @@ export const Navigation: React.FC<NavigationProps> = ({
     <header className="main-header">
       <div className="header-content">
         <div className="brand">
-          <h1>🛡️ Spam Detector</h1>
+          <h1>🛡️ SpamWall</h1>
           <p className="tagline">AI-powered email classification</p>
         </div>
         

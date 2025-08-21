@@ -78,7 +78,7 @@ export const AuthComponent: React.FC = () => {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          <h2>🛡️ Spam Detector</h2>
+          <h2>🛡️ SpamWall</h2>
           <p>Sign in to access your personalized spam detection dashboard</p>
         </div>
 

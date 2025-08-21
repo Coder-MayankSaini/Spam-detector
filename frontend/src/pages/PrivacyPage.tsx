@@ -34,7 +34,7 @@ export const PrivacyPage: React.FC = () => {
           <section className="privacy-section introduction">
             <div className="section-content">
               <p className="intro-text">
-                At Spam Detector, we are committed to protecting your privacy and ensuring the security of your personal information. 
+                At SpamWall, we are committed to protecting your privacy and ensuring the security of your personal information. 
                 This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our AI-powered 
                 spam detection service. Please read this policy carefully to understand our views and practices regarding your personal data.
               </p>
@@ -291,7 +291,7 @@ export const PrivacyPage: React.FC = () => {
               
               <div className="contact-details">
                 <div className="contact-method">
-                  <strong>Email:</strong> privacy@spamdetector.ai
+                  <strong>Email:</strong> privacy@spamwall.ai
                 </div>
                 <div className="contact-method">
                   <strong>Address:</strong> 123 Privacy Street, San Francisco, CA 94102

@@ -42,7 +42,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Listen for storage changes (when token is set/removed in other tabs)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'spam_detector_token') {
+      if (e.key === 'spamwall_token') {
         checkAuthStatus();
       }
     };

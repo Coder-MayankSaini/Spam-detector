@@ -6,7 +6,7 @@ export const AboutPage: React.FC = () => {
     <div className="about-page">
       <div className="about-hero">
         <div className="about-hero-content">
-          <h1>🛡️ About Spam Detector</h1>
+          <h1>🛡️ About SpamWall</h1>
           <p className="hero-subtitle">Empowering users with AI-driven email security</p>
         </div>
       </div>
@@ -18,7 +18,7 @@ export const AboutPage: React.FC = () => {
           </div>
           <div className="section-content">
             <p>
-              At Spam Detector, we're on a mission to protect your digital communication from unwanted and malicious content. 
+              At SpamWall, we're on a mission to protect your digital communication from unwanted and malicious content. 
               Our advanced AI-powered platform combines cutting-edge machine learning with intelligent text and image analysis 
               to provide comprehensive email security solutions.
             </p>
@@ -134,7 +134,7 @@ export const AboutPage: React.FC = () => {
           </div>
           <div className="section-content">
             <p>
-              Ready to experience the future of email security? Join thousands of users who trust Spam Detector to keep 
+              Ready to experience the future of email security? Join thousands of users who trust SpamWall to keep 
               their inboxes clean and secure.
             </p>
             <div className="cta-stats">

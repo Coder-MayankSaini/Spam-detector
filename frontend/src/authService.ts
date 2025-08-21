@@ -21,7 +21,7 @@ interface RegisterRequest {
 
 class AuthService {
   private baseUrl = process.env.REACT_APP_API_URL || 'https://web-production-02077.up.railway.app';
-  private tokenKey = 'spam_detector_token';
+  private tokenKey = 'spamwall_token';
 
   async register(data: RegisterRequest): Promise<AuthResponse> {
     const response = await fetch(`${this.baseUrl}/register`, {

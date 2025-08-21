@@ -65,7 +65,7 @@ export const ContactPage: React.FC = () => {
     {
       icon: '📧',
       title: 'Email Support',
-      value: 'support@spamdetector.ai',
+      value: 'support@spamwall.ai',
       description: 'Get help with technical issues and account questions'
     },
     {
