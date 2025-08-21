@@ -1,4 +1,5 @@
-import { EmailAnalysis, HistoryItem, Stats, TrainingItem } from './types';
+imp// Use environment variable for API base URL, fallback to Railway production
+const API_BASE = process.env.REACT_APP_API_URL || 'https://web-production-02077.up.railway.app';t { EmailAnalysis, HistoryItem, Stats, TrainingItem } from './types';
 import { authService } from './authService';
 
 // Use environment variable for API base URL, fallback to localhost for development
