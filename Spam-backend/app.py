@@ -415,7 +415,7 @@ def register():
         user_id = db_manager.create_user(email, password_hash)
         
         # Generate JWT token
-        access_token = create_access_token(identity=str(user_id))
+        access_token = create_access_token(identity=str(user_id))  # String identity for Flask-JWT-Extended
         
         return jsonify({
             'message': 'User registered successfully',
