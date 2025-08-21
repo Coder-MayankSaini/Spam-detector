@@ -4,6 +4,13 @@ import { authService } from './authService';
 // Use environment variable for API base URL, fallback to localhost for development
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
+// Debug logging
+console.log('API Service initialized with:', {
+  REACT_APP_API_URL: process.env.REACT_APP_API_URL,
+  API_BASE,
+  NODE_ENV: process.env.NODE_ENV
+});
+
 class ApiService {
   async analyzeEmail(emailText: string): Promise<EmailAnalysis> {
     const response = await fetch(`${API_BASE}/analyze`, {
