@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Local Spam Detector</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        .container { background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        input, textarea { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px; }
+        .result { background: #e9ecef; padding: 15px; border-radius: 5px; margin-top: 10px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Local Spam Detector Test</h1>
+    
+    <div class="container">
+        <h3>1. Health Check</h3>
+        <button onclick="healthCheck()">Check Server Health</button>
+        <div id="health-result"></div>
+    </div>
+
+    <div class="container">
+        <h3>2. User Registration</h3>
+        <input type="text" id="reg-username" placeholder="Username" value="testuser7">
+        <input type="email" id="reg-email" placeholder="Email" value="test7@example.com">
+        <input type="password" id="reg-password" placeholder="Password" value="password123">
+        <button onclick="register()">Register</button>
+        <div id="register-result"></div>
+    </div>
+
+    <div class="container">
+        <h3>3. User Login</h3>
+        <input type="text" id="login-username" placeholder="Username" value="testuser7">
+        <input type="password" id="login-password" placeholder="Password" value="password123">
+        <button onclick="login()">Login</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="container">
+        <h3>4. Spam Analysis</h3>
+        <textarea id="email-text" rows="4" placeholder="Enter email text to analyze">
+FREE MONEY!!! Click here now to claim your URGENT prize of $1,000,000! 
+Act now, limited time offer! No risk guaranteed! Call now!!!
+        </textarea>
+        <button onclick="analyzeSpam()">Analyze Email</button>
+        <div id="analyze-result"></div>
+    </div>
+
+    <div class="container">
+        <h3>5. Analysis History</h3>
+        <button onclick="getHistory()">Get History</button>
+        <div id="history-result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        let authToken = '';
+
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            element.className = 'result ' + (isError ? 'error' : 'success');
+        }
+
+        async function healthCheck() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                showResult('health-result', data);
+            } catch (error) {
+                showResult('health-result', { error: error.message }, true);
+            }
+        }
+
+        async function register() {
+            const username = document.getElementById('reg-username').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, email, password })
+                });
+                
+                const data = await response.json();
+                if (data.token) {
+                    authToken = data.token;
+                    // Auto-fill login fields
+                    document.getElementById('login-username').value = username;
+                    document.getElementById('login-password').value = password;
+                }
+                showResult('register-result', data, !response.ok);
+            } catch (error) {
+                showResult('register-result', { error: error.message }, true);
+            }
+        }
+
+        async function login() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                if (data.token) {
+                    authToken = data.token;
+                }
+                showResult('login-result', data, !response.ok);
+            } catch (error) {
+                showResult('login-result', { error: error.message }, true);
+            }
+        }
+
+        async function analyzeSpam() {
+            const text = document.getElementById('email-text').value;
+
+            if (!authToken) {
+                showResult('analyze-result', { error: 'Please login first' }, true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ text })
+                });
+                
+                const data = await response.json();
+                showResult('analyze-result', data, !response.ok);
+            } catch (error) {
+                showResult('analyze-result', { error: error.message }, true);
+            }
+        }
+
+        async function getHistory() {
+            if (!authToken) {
+                showResult('history-result', { error: 'Please login first' }, true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/history`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                showResult('history-result', data, !response.ok);
+            } catch (error) {
+                showResult('history-result', { error: error.message }, true);
+            }
+        }
+
+        // Auto-check health on load
+        window.onload = function() {
+            setTimeout(healthCheck, 500);
+        };
+    </script>
+</body>
+</html>
