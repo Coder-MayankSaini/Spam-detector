@@ -37,10 +37,31 @@ import nltk
 from bs4 import BeautifulSoup
 
 # OCR and Image Processing
+# Logging
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 from PIL import Image, ImageEnhance, ImageFilter
 import pytesseract
-import cv2
-import easyocr
+
+# Optional OCR dependencies
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    logger.warning("OpenCV not available - using basic image processing")
+    CV2_AVAILABLE = False
+
+try:
+    import easyocr
+    EASYOCR_AVAILABLE = True
+except ImportError:
+    logger.warning("EasyOCR not available - OCR will use Tesseract only")
+    EASYOCR_AVAILABLE = False
 
 # Email Processing
 import email

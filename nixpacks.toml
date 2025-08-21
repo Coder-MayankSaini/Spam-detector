@@ -2,17 +2,6 @@ providers = ["python"]
 
 [variables]
 PYTHONUNBUFFERED = "1"
-PIP_NO_CACHE_DIR = "1"
-PIP_DISABLE_PIP_VERSION_CHECK = "1"
-
-[phases.setup]
-nixPkgs = ["python311", "tesseract", "pkg-config", "gcc", "g++"]
-
-[phases.install]
-cmds = [
-  "pip install --upgrade pip setuptools wheel",
-  "pip install -r requirements.txt"
-]
 
 [start]
 cmd = "bash start.sh"
