@@ -1,12 +1,10 @@
 tesseract-ocr
 tesseract-ocr-eng
-tesseract-ocr-osd
 libgl1-mesa-glx
 libglib2.0-0
 libsm6
 libxext6
-libfontconfig1
 libxrender1
 libgomp1
-libgthread-2.0-0
-libgtk-3-0
+build-essential
+pkg-config
