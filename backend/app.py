@@ -20,7 +20,14 @@ import base64
 import io
 from PIL import Image
 import pytesseract
-import cv2
+try:
+    import cv2
+    OPENCV_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  OpenCV not available: {e}")
+    print("🔄 Image processing will use PIL only")
+    cv2 = None
+    OPENCV_AVAILABLE = False
 import re
 import bcrypt
 import smtplib
@@ -529,17 +536,23 @@ def analyze_image():
         image_bytes = base64.b64decode(image_data)
         image = Image.open(io.BytesIO(image_bytes))
         
-        # Convert to OpenCV format for preprocessing
-        opencv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        
         # Preprocess image for better OCR
-        gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
-        
-        # Apply threshold to get better text extraction
-        _, threshold = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        if OPENCV_AVAILABLE and cv2:
+            # Use OpenCV for advanced preprocessing
+            opencv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+            gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
+            _, processed_image = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            # Convert back to PIL Image for OCR
+            processed_pil = Image.fromarray(processed_image)
+        else:
+            # Use PIL for basic preprocessing
+            if image.mode != 'L':
+                processed_pil = image.convert('L')  # Convert to grayscale
+            else:
+                processed_pil = image
         
         # Extract text using OCR
-        extracted_text = pytesseract.image_to_string(threshold)
+        extracted_text = pytesseract.image_to_string(processed_pil)
         
         if not extracted_text.strip():
             return jsonify({'error': 'No text could be extracted from the image'}), 400

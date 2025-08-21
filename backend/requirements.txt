@@ -10,5 +10,6 @@ numpy
 requests
 pillow
 pytesseract
-opencv-python
+opencv-python-headless
 bcrypt
+psycopg2-binary
