@@ -28,14 +28,24 @@ class DatabaseManager:
         try:
             if self.database_url:
                 # Use DATABASE_URL if available (for Railway, Heroku, etc.)
+                logger.info("Connecting to database using DATABASE_URL")
                 conn = psycopg2.connect(self.database_url)
             else:
                 # Use individual config parameters
-                conn = psycopg2.connect(**self.db_config)
+                logger.info("Connecting to database using individual parameters")
+                # Filter out None values
+                filtered_config = {k: v for k, v in self.db_config.items() if v is not None}
+                conn = psycopg2.connect(**filtered_config)
             
             conn.autocommit = False
+            logger.debug("Database connection established successfully")
             yield conn
             
+        except psycopg2.Error as e:
+            if conn:
+                conn.rollback()
+            logger.error(f"PostgreSQL error: {e}")
+            raise
         except Exception as e:
             if conn:
                 conn.rollback()
@@ -44,6 +54,7 @@ class DatabaseManager:
         finally:
             if conn:
                 conn.close()
+                logger.debug("Database connection closed")
     
     def init_database(self):
         """Initialize database tables"""

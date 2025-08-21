@@ -1,34 +1,20 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-# from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
-from database import db_manager
+from simple_database import db_manager  # Use simple database instead
 import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
-from sklearn.metrics import classification_report, confusion_matrix
-import pandas as pd
-import numpy as np
 import os
-import json
 import logging
 import time
 from datetime import datetime, timedelta
 import jwt
 from functools import wraps
 from dotenv import load_dotenv
-import base64
-import io
-from PIL import Image
-import pytesseract
-import cv2
 import re
 import bcrypt
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import secrets
-import hashlib
 
 # Load environment variables
 load_dotenv()
@@ -44,8 +30,9 @@ CORS(app,
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 # JWT Configuration
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
+
 # Custom JWT functions
 def create_custom_access_token(user_id):
     """Create custom JWT access token"""
@@ -58,36 +45,20 @@ def create_custom_access_token(user_id):
     token = jwt.encode(payload, app.config['JWT_SECRET_KEY'], algorithm='HS256')
     return token
 
-# Custom JWT decorator (defined above with custom_jwt_required)
-
 # Configuration
 class Config:
-    DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
+    DEBUG = os.getenv('DEBUG', 'true').lower() == 'true'
     PORT = int(os.getenv('PORT', 5001))
     HOST = os.getenv('HOST', '0.0.0.0')
     
-    # Email configuration
-    EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
-    EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-    EMAIL_USER = os.getenv('EMAIL_USER')
-    EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
-    EMAIL_FROM = os.getenv('EMAIL_FROM', os.getenv('EMAIL_USER'))
-    
     # Frontend URL for password reset emails
     FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://spamwall.vercel.app')
-    
-    # OCR configuration
-    TESSERACT_PATH = os.getenv('TESSERACT_PATH', '/usr/bin/tesseract')
 
 config = Config()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO if not config.DEBUG else logging.DEBUG)
 logger = logging.getLogger(__name__)
-
-# Configure Tesseract path
-if config.TESSERACT_PATH:
-    pytesseract.pytesseract.tesseract_cmd = config.TESSERACT_PATH
 
 # Load the spam detection model
 MODEL_PATH = 'spam_model.joblib'
@@ -133,6 +104,8 @@ def create_default_model():
             ("URGENT: Your account will be suspended!", 1),
             ("You have won a lottery! Claim your prize now!", 1),
             ("Click here for exclusive deals! Act now!", 1),
+            ("Make money from home! No experience needed!", 1),
+            ("Your credit card has been charged. Click to dispute.", 1),
             ("Meeting scheduled for tomorrow at 2 PM", 0),
             ("Please review the attached document", 0),
             ("How was your weekend?", 0),
@@ -147,10 +120,6 @@ def create_default_model():
         labels = [item[1] for item in training_data]
         
         # Create pipeline with more robust settings
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        from sklearn.naive_bayes import MultinomialNB
-        from sklearn.pipeline import make_pipeline
-        
         vectorizer = TfidfVectorizer(
             max_features=1000,
             stop_words='english',
@@ -269,216 +238,6 @@ def rate_limit(max_requests=60, window=60):
         return decorated_function
     return decorator
 
-def send_password_reset_email(email, reset_token):
-    """Send password reset email with beautiful HTML template"""
-    try:
-        if not config.EMAIL_USER or not config.EMAIL_PASSWORD:
-            logger.error("Email configuration missing")
-            return False
-        
-        reset_url = f"{config.FRONTEND_URL}/reset-password?token={reset_token}"
-        
-        # Beautiful HTML email template
-        html_template = f"""
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Reset Your Password - Spam Detector</title>
-            <style>
-                body {{
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    line-height: 1.6;
-                    margin: 0;
-                    padding: 0;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                }}
-                .container {{
-                    max-width: 600px;
-                    margin: 40px auto;
-                    background: white;
-                    border-radius: 15px;
-                    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-                    overflow: hidden;
-                }}
-                .header {{
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 40px 30px;
-                    text-align: center;
-                }}
-                .header h1 {{
-                    margin: 0;
-                    font-size: 28px;
-                    font-weight: 700;
-                }}
-                .header .subtitle {{
-                    margin: 10px 0 0 0;
-                    font-size: 16px;
-                    opacity: 0.9;
-                }}
-                .content {{
-                    padding: 40px 30px;
-                }}
-                .greeting {{
-                    font-size: 18px;
-                    color: #333;
-                    margin-bottom: 20px;
-                }}
-                .message {{
-                    font-size: 16px;
-                    color: #555;
-                    margin-bottom: 30px;
-                    line-height: 1.8;
-                }}
-                .reset-button {{
-                    display: inline-block;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 15px 40px;
-                    text-decoration: none;
-                    border-radius: 50px;
-                    font-weight: 600;
-                    font-size: 16px;
-                    text-align: center;
-                    margin: 20px 0;
-                    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
-                    transition: all 0.3s ease;
-                }}
-                .reset-button:hover {{
-                    transform: translateY(-2px);
-                    box-shadow: 0 15px 30px rgba(102, 126, 234, 0.4);
-                }}
-                .security-info {{
-                    background: #f8f9ff;
-                    border-left: 4px solid #667eea;
-                    padding: 20px;
-                    margin: 30px 0;
-                    border-radius: 0 8px 8px 0;
-                }}
-                .security-info h3 {{
-                    margin: 0 0 10px 0;
-                    color: #333;
-                    font-size: 16px;
-                }}
-                .security-info p {{
-                    margin: 0;
-                    color: #666;
-                    font-size: 14px;
-                    line-height: 1.6;
-                }}
-                .footer {{
-                    background: #f8f9fa;
-                    padding: 30px;
-                    text-align: center;
-                    border-top: 1px solid #e9ecef;
-                }}
-                .footer p {{
-                    margin: 0;
-                    color: #666;
-                    font-size: 14px;
-                }}
-                .footer .brand {{
-                    font-weight: 600;
-                    color: #667eea;
-                }}
-                .divider {{
-                    height: 1px;
-                    background: linear-gradient(90deg, transparent 0%, #667eea 50%, transparent 100%);
-                    margin: 30px 0;
-                }}
-                @media (max-width: 600px) {{
-                    .container {{
-                        margin: 20px;
-                        border-radius: 10px;
-                    }}
-                    .header, .content, .footer {{
-                        padding: 25px 20px;
-                    }}
-                    .header h1 {{
-                        font-size: 24px;
-                    }}
-                    .reset-button {{
-                        padding: 12px 30px;
-                        font-size: 14px;
-                    }}
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🛡️ Spam Detector</h1>
-                    <p class="subtitle">Password Reset Request</p>
-                </div>
-                
-                <div class="content">
-                    <div class="greeting">Hello there! 👋</div>
-                    
-                    <div class="message">
-                        We received a request to reset your password for your Spam Detector account. 
-                        If you made this request, click the button below to reset your password:
-                    </div>
-                    
-                    <div style="text-align: center;">
-                        <a href="{reset_url}" class="reset-button">
-                            🔐 Reset My Password
-                        </a>
-                    </div>
-                    
-                    <div class="security-info">
-                        <h3>🔒 Security Information</h3>
-                        <p>
-                            • This link will expire in 1 hour for security reasons<br>
-                            • If you didn't request this reset, please ignore this email<br>
-                            • Your password won't change until you create a new one<br>
-                            • For security, always verify the sender's email address
-                        </p>
-                    </div>
-                    
-                    <div class="divider"></div>
-                    
-                    <div class="message">
-                        <strong>Having trouble with the button?</strong><br>
-                        Copy and paste this link into your browser:<br>
-                        <a href="{reset_url}" style="color: #667eea; word-break: break-all;">{reset_url}</a>
-                    </div>
-                </div>
-                
-                <div class="footer">
-                    <p>
-                        This email was sent by <span class="brand">Spam Detector</span><br>
-                        Your trusted email security solution
-                    </p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = "🔐 Reset Your Spam Detector Password"
-        msg['From'] = config.EMAIL_FROM
-        msg['To'] = email
-        
-        # Attach HTML content
-        html_part = MIMEText(html_template, 'html')
-        msg.attach(html_part)
-        
-        # Send email
-        with smtplib.SMTP(config.EMAIL_HOST, config.EMAIL_PORT) as server:
-            server.starttls()
-            server.login(config.EMAIL_USER, config.EMAIL_PASSWORD)
-            server.send_message(msg)
-        
-        logger.info(f"Password reset email sent to {email}")
-        return True
-        
-    except Exception as e:
-        logger.error(f"Error sending password reset email: {e}")
-        return False
-
 # Routes
 
 @app.route('/health', methods=['GET'])
@@ -487,7 +246,8 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
-        'version': '1.0.0'
+        'version': '1.0.0',
+        'model_loaded': model is not None
     })
 
 @app.route('/register', methods=['POST'])
@@ -591,9 +351,9 @@ def analyze_email():
         email_text = data['text'].strip()
         logger.info(f"Analyzing email with {len(email_text)} characters")
         
-        if len(email_text) < 10:
+        if len(email_text) < 5:  # Reduced minimum length
             logger.warning(f"Email text too short: {len(email_text)} characters")
-            return jsonify({'error': 'Email text too short for analysis (minimum 10 characters)'}), 400
+            return jsonify({'error': 'Email text too short for analysis (minimum 5 characters)'}), 400
         
         # Predict spam probability
         logger.debug("Making prediction with model")
@@ -632,70 +392,6 @@ def analyze_email():
     except Exception as e:
         logger.error(f"Analysis error: {str(e)}", exc_info=True)
         return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
-
-@app.route('/analyze-image', methods=['POST'])
-@custom_jwt_required
-@rate_limit(max_requests=20, window=60)
-def analyze_image():
-    """Analyze image for spam detection using OCR"""
-    try:
-        data = request.get_json()
-        if not data or not data.get('image'):
-            return jsonify({'error': 'Image data is required'}), 400
-        
-        # Decode base64 image
-        image_data = data['image']
-        if ',' in image_data:
-            image_data = image_data.split(',')[1]
-        
-        image_bytes = base64.b64decode(image_data)
-        image = Image.open(io.BytesIO(image_bytes))
-        
-        # Convert to OpenCV format for preprocessing
-        opencv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        
-        # Preprocess image for better OCR
-        gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
-        
-        # Apply threshold to get better text extraction
-        _, threshold = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        
-        # Extract text using OCR
-        extracted_text = pytesseract.image_to_string(threshold)
-        
-        if not extracted_text.strip():
-            return jsonify({'error': 'No text could be extracted from the image'}), 400
-        
-        if not model:
-            return jsonify({'error': 'Model not available'}), 500
-        
-        # Analyze extracted text
-        prediction = model.predict([extracted_text])[0]
-        probabilities = model.predict_proba([extracted_text])[0]
-        
-        is_spam = bool(prediction)
-        confidence = float(max(probabilities))
-        
-        # Get user ID from custom JWT decorator
-        user_id = request.current_user_id
-        client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR'))
-        
-        # Save analysis to database
-        db_manager.save_analysis(user_id, extracted_text, is_spam, confidence, 'image', client_ip)
-        
-        return jsonify({
-            'is_spam': is_spam,
-            'confidence': confidence,
-            'extracted_text': extracted_text,
-            'analysis': {
-                'spam_probability': float(probabilities[1]) if len(probabilities) > 1 else confidence,
-                'ham_probability': float(probabilities[0]) if len(probabilities) > 1 else 1 - confidence
-            }
-        })
-        
-    except Exception as e:
-        logger.error(f"Image analysis error: {e}")
-        return jsonify({'error': 'Image analysis failed'}), 500
 
 @app.route('/history', methods=['GET'])
 @custom_jwt_required
@@ -773,121 +469,6 @@ def contact():
         logger.error(f"Contact form error: {e}")
         return jsonify({'error': 'Failed to send message'}), 500
 
-@app.route('/forgot-password', methods=['POST'])
-@rate_limit(max_requests=3, window=300)  # 3 requests per 5 minutes
-def forgot_password():
-    """Handle password reset requests"""
-    try:
-        data = request.get_json()
-        
-        if not data or not data.get('email'):
-            return jsonify({'error': 'Email is required'}), 400
-        
-        email = data['email'].lower().strip()
-        
-        if not validate_email(email):
-            return jsonify({'error': 'Invalid email format'}), 400
-        
-        # Check if user exists
-        user = db_manager.get_user_by_email(email)
-        if not user:
-            # Don't reveal whether user exists or not
-            return jsonify({'message': 'If the email exists, a reset link has been sent'})
-        
-        # Generate reset token
-        reset_token = secrets.token_urlsafe(32)
-        expires_at = datetime.now() + timedelta(hours=1)
-        
-        # Save reset token
-        if db_manager.update_reset_token(email, reset_token, expires_at):
-            # Send password reset email
-            if send_password_reset_email(email, reset_token):
-                return jsonify({'message': 'If the email exists, a reset link has been sent'})
-            else:
-                return jsonify({'error': 'Failed to send reset email'}), 500
-        else:
-            return jsonify({'error': 'Failed to process reset request'}), 500
-        
-    except Exception as e:
-        logger.error(f"Password reset error: {e}")
-        return jsonify({'error': 'Password reset failed'}), 500
-
-@app.route('/reset-password', methods=['POST'])
-@rate_limit(max_requests=5, window=300)
-def reset_password():
-    """Handle password reset"""
-    try:
-        data = request.get_json()
-        
-        if not data or not data.get('token') or not data.get('password'):
-            return jsonify({'error': 'Token and new password are required'}), 400
-        
-        token = data['token']
-        new_password = data['password']
-        
-        # Validate password strength
-        if len(new_password) < 6:
-            return jsonify({'error': 'Password must be at least 6 characters long'}), 400
-        
-        # Get user by reset token
-        user = db_manager.get_user_by_reset_token(token)
-        if not user:
-            return jsonify({'error': 'Invalid or expired reset token'}), 400
-        
-        # Hash new password
-        password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        
-        # Update password
-        if db_manager.update_password(user['id'], password_hash):
-            return jsonify({'message': 'Password reset successfully'})
-        else:
-            return jsonify({'error': 'Failed to reset password'}), 500
-        
-    except Exception as e:
-        logger.error(f"Password reset error: {e}")
-        return jsonify({'error': 'Password reset failed'}), 500
-
-@app.route('/retrain', methods=['POST'])
-@custom_jwt_required
-@rate_limit(max_requests=5, window=300)
-def retrain_model():
-    """Retrain the spam detection model with new data"""
-    try:
-        data = request.get_json()
-        
-        if not data or not data.get('training_data'):
-            return jsonify({'error': 'Training data is required'}), 400
-        
-        training_data = data['training_data']
-        
-        if not isinstance(training_data, list) or len(training_data) == 0:
-            return jsonify({'error': 'Training data must be a non-empty list'}), 400
-        
-        # Validate training data format
-        texts = []
-        labels = []
-        
-        for item in training_data:
-            if not isinstance(item, dict) or 'text' not in item or 'is_spam' not in item:
-                return jsonify({'error': 'Each training item must have "text" and "is_spam" fields'}), 400
-            
-            texts.append(item['text'])
-            labels.append(1 if item['is_spam'] else 0)
-        
-        # Create and train new model
-        global model
-        model = make_pipeline(TfidfVectorizer(), MultinomialNB())
-        model.fit(texts, labels)
-        
-        # Save the retrained model
-        joblib.dump(model, MODEL_PATH)
-        
-        return jsonify({'message': f'Model retrained successfully with {len(training_data)} samples'})
-        
-    except Exception as e:
-        logger.error(f"Model retraining error: {e}")
-        return jsonify({'error': 'Model retraining failed'}), 500
-
 @app.route('/verify-token', methods=['GET'])
 @custom_jwt_required
 def verify_token():
@@ -906,7 +487,7 @@ def verify_token():
             'user': {
                 'id': user['id'],
                 'email': user['email'],
-                'created_at': user['created_at'].isoformat()
+                'created_at': user['created_at'].isoformat() if isinstance(user['created_at'], datetime) else str(user['created_at'])
             }
         })
         

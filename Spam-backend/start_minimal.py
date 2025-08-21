@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Enhanced startup script for Spam Detector Backend
-This script initializes the environment and starts the server with better error handling.
+Minimal startup script for Spam Detector Backend
+Basic functionality only - no OpenCV or complex dependencies
 """
 
 import os
@@ -34,18 +34,20 @@ PORT=5001
 
 def main():
     """Main startup function"""
-    logger.info("🚀 Starting Spam Detector Backend...")
+    logger.info("🚀 Starting Spam Detector Backend (Minimal Version)...")
+    logger.info("📧 Text analysis only (no image processing)")
     
     # Create basic environment if needed
     create_basic_env()
     
     # Import and run the Flask app
     try:
-        from app import app, config
-        logger.info("✅ App imported successfully")
+        from app_minimal import app, config
+        logger.info("✅ Minimal app imported successfully")
         
         logger.info(f"🌐 Starting server on {config.HOST}:{config.PORT}")
         logger.info(f"🔧 Debug mode: {config.DEBUG}")
+        logger.info("📝 Using in-memory database (no PostgreSQL required)")
         
         app.run(
             host=config.HOST,
@@ -55,10 +57,11 @@ def main():
         
     except ImportError as e:
         logger.error(f"❌ Import error: {e}")
-        logger.info("💡 Make sure all dependencies are installed: pip install -r requirements.txt")
+        logger.info("💡 Make sure basic dependencies are installed")
         sys.exit(1)
     except Exception as e:
         logger.error(f"❌ Startup error: {e}")
+        logger.error("Full error:", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":
