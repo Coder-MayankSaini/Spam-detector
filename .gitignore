@@ -231,3 +231,4 @@ logs/
 *.7z
 *.tar.gz
 *.tar.bz2
+.vercel
