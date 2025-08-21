@@ -11,8 +11,11 @@ export interface EmailAnalysis {
 }
 
 export interface HistoryItem {
-  text: string;
+  email_text: string;  // Backend returns email_text, not text
+  text: string;        // Keep for backward compatibility
   is_spam: boolean;
+  confidence: number;
+  analysis_type?: string;
   timestamp: string;
 }
 

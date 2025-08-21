@@ -73,7 +73,12 @@ class ApiService {
     }
     
     const data = await response.json();
-    return Array.isArray(data) ? data : [];
+    // Map backend response to frontend interface
+    const mappedData = Array.isArray(data) ? data.map(item => ({
+      ...item,
+      text: item.email_text || item.text || '', // Map email_text to text for compatibility
+    })) : [];
+    return mappedData;
   }
 
   async getStats(): Promise<Stats> {
