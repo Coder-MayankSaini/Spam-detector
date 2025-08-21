@@ -1,16 +1,4 @@
 providers = ["python"]
 
-[phases.install]
-cmds = [
-  "python -m pip install --upgrade pip",
-  "python -m pip install -r requirements.txt"
-]
-
-[phases.build]
-cmds = [
-  "python -c 'import nltk; nltk.download(\"punkt\"); nltk.download(\"stopwords\"); nltk.download(\"wordnet\")'",
-  "python -c 'import sklearn; print(\"Scikit-learn version:\", sklearn.__version__)'"
-]
-
 [start]
-cmd = "python -m gunicorn app_production:app --bind 0.0.0.0:$PORT --workers 2 --timeout 60 --preload"
+cmd = "bash start.sh"
