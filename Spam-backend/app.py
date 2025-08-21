@@ -60,6 +60,9 @@ class Config:
     EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
     EMAIL_FROM = os.getenv('EMAIL_FROM', os.getenv('EMAIL_USER'))
     
+    # Frontend URL for password reset emails
+    FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://spamwall.vercel.app')
+    
     # OCR configuration
     TESSERACT_PATH = os.getenv('TESSERACT_PATH', '/usr/bin/tesseract')
 
@@ -168,7 +171,7 @@ def send_password_reset_email(email, reset_token):
             logger.error("Email configuration missing")
             return False
         
-        reset_url = f"http://localhost:3000/reset-password?token={reset_token}"
+        reset_url = f"{config.FRONTEND_URL}/reset-password?token={reset_token}"
         
         # Beautiful HTML email template
         html_template = f"""
