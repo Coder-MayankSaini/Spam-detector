@@ -50,7 +50,7 @@ jwt = JWTManager(app)
 # Configuration
 class Config:
     DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
-    PORT = int(os.getenv('PORT', 5001))
+    PORT = int(os.getenv('PORT', 5000))
     HOST = os.getenv('HOST', '0.0.0.0')
     
     # Email configuration
@@ -125,8 +125,11 @@ try:
     logger.info("Database initialized successfully")
 except Exception as e:
     logger.error(f"Database initialization failed: {e}")
+    logger.warning("Continuing without database - some features will be limited")
 
 load_model()
+
+# Utility functions
 
 # Utility functions
 def validate_email(email):
@@ -776,6 +779,10 @@ def rate_limit_exceeded(error):
     return jsonify({'error': 'Rate limit exceeded. Please try again later.'}), 429
 
 if __name__ == '__main__':
+    logger.info(f"Starting Spam Detector API on {config.HOST}:{config.PORT}")
+    logger.info(f"Debug mode: {config.DEBUG}")
+    logger.info(f"Environment: {os.getenv('RAILWAY_ENVIRONMENT', 'local')}")
+    
     app.run(
         host=config.HOST,
         port=config.PORT,
