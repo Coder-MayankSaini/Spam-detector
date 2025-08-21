@@ -415,7 +415,7 @@ def register():
         user_id = db_manager.create_user(email, password_hash)
         
         # Generate JWT token
-        access_token = create_access_token(identity=user_id)
+        access_token = create_access_token(identity=str(user_id))
         
         return jsonify({
             'message': 'User registered successfully',
@@ -451,7 +451,7 @@ def login():
             return jsonify({'error': 'Invalid email or password'}), 401
         
         # Generate JWT token
-        access_token = create_access_token(identity=user['id'])
+        access_token = create_access_token(identity=str(user['id']))
         
         return jsonify({
             'message': 'Login successful',
@@ -489,7 +489,7 @@ def analyze_email():
         confidence = float(max(probabilities))
         
         # Get user ID from JWT
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR'))
         
         # Save analysis to database
@@ -552,7 +552,7 @@ def analyze_image():
         confidence = float(max(probabilities))
         
         # Get user ID from JWT
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR'))
         
         # Save analysis to database
@@ -577,7 +577,7 @@ def analyze_image():
 def get_history():
     """Get user's analysis history"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         limit = min(int(request.args.get('limit', 50)), 100)  # Max 100 records
         
         history = db_manager.get_user_history(user_id, limit)
@@ -604,7 +604,7 @@ def get_history():
 def get_stats():
     """Get user statistics"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         stats = db_manager.get_user_stats(user_id)
         
         return jsonify({
@@ -768,8 +768,9 @@ def retrain_model():
 def verify_token():
     """Verify JWT token and return user information"""
     try:
-        # Get current user ID from JWT token
-        current_user_id = get_jwt_identity()
+        # Get current user ID from JWT token (as string, convert to int)
+        current_user_id_str = get_jwt_identity()
+        current_user_id = int(current_user_id_str)
         
         # Get user information
         user = db.get_user_by_id(current_user_id)
