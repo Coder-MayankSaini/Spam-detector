@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
+# from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
 from database import db_manager
 import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -14,6 +14,7 @@ import json
 import logging
 import time
 from datetime import datetime, timedelta
+import jwt
 from functools import wraps
 from dotenv import load_dotenv
 import base64
@@ -45,7 +46,18 @@ CORS(app,
 # JWT Configuration
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
-jwt = JWTManager(app)
+# Custom JWT functions
+def create_custom_access_token(user_id):
+    """Create custom JWT access token"""
+    payload = {
+        'user_id': user_id,
+        'exp': datetime.utcnow() + timedelta(hours=24),
+        'iat': datetime.utcnow()
+    }
+    token = jwt.encode(payload, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+    return token
+
+# Custom JWT decorator (defined above with custom_jwt_required)
 
 # Configuration
 class Config:
@@ -136,6 +148,43 @@ def validate_email(email):
     """Validate email format"""
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return re.match(pattern, email) is not None
+
+def custom_jwt_required(f):
+    """Custom JWT authentication decorator"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        auth_header = request.headers.get('Authorization')
+        
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+        
+        if not token:
+            return jsonify({'error': 'Token is missing'}), 401
+        
+        try:
+            # Decode JWT token
+            data = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+            current_user_id = data.get('sub')  # Flask-JWT-Extended uses 'sub' field
+            
+            # Convert to integer if it's a string
+            if isinstance(current_user_id, str):
+                current_user_id = int(current_user_id)
+            
+            # Store user ID for the route function
+            request.current_user_id = current_user_id
+            
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token has expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Token is invalid'}), 401
+        except Exception as e:
+            logger.error(f"JWT validation error: {e}")
+            return jsonify({'error': 'Token validation failed'}), 401
+        
+        return f(*args, **kwargs)
+    
+    return decorated
 
 def rate_limit(max_requests=60, window=60):
     """Simple rate limiting decorator"""
@@ -418,7 +467,7 @@ def register():
         user_id = db_manager.create_user(email, password_hash)
         
         # Generate JWT token
-        access_token = create_access_token(identity=str(user_id))  # String identity for Flask-JWT-Extended
+        access_token = create_custom_access_token(user_id)
         
         return jsonify({
             'message': 'User registered successfully',
@@ -454,7 +503,7 @@ def login():
             return jsonify({'error': 'Invalid email or password'}), 401
         
         # Generate JWT token
-        access_token = create_access_token(identity=str(user['id']))
+        access_token = create_custom_access_token(user['id'])
         
         return jsonify({
             'message': 'Login successful',
@@ -467,7 +516,7 @@ def login():
         return jsonify({'error': 'Login failed'}), 500
 
 @app.route('/analyze', methods=['POST'])
-@jwt_required()
+@custom_jwt_required
 @rate_limit(max_requests=100, window=60)
 def analyze_email():
     """Analyze email for spam detection"""
@@ -491,8 +540,8 @@ def analyze_email():
         is_spam = bool(prediction)
         confidence = float(max(probabilities))
         
-        # Get user ID from JWT
-        user_id = int(get_jwt_identity())
+        # Get user ID from custom JWT decorator
+        user_id = request.current_user_id
         client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR'))
         
         # Save analysis to database
@@ -512,7 +561,7 @@ def analyze_email():
         return jsonify({'error': 'Analysis failed'}), 500
 
 @app.route('/analyze-image', methods=['POST'])
-@jwt_required()
+@custom_jwt_required
 @rate_limit(max_requests=20, window=60)
 def analyze_image():
     """Analyze image for spam detection using OCR"""
@@ -554,8 +603,8 @@ def analyze_image():
         is_spam = bool(prediction)
         confidence = float(max(probabilities))
         
-        # Get user ID from JWT
-        user_id = int(get_jwt_identity())
+        # Get user ID from custom JWT decorator
+        user_id = request.current_user_id
         client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR'))
         
         # Save analysis to database
@@ -576,11 +625,11 @@ def analyze_image():
         return jsonify({'error': 'Image analysis failed'}), 500
 
 @app.route('/history', methods=['GET'])
-@jwt_required()
+@custom_jwt_required
 def get_history():
     """Get user's analysis history"""
     try:
-        user_id = int(get_jwt_identity())
+        user_id = request.current_user_id
         limit = min(int(request.args.get('limit', 50)), 100)  # Max 100 records
         
         history = db_manager.get_user_history(user_id, limit)
@@ -603,11 +652,11 @@ def get_history():
         return jsonify({'error': 'Failed to retrieve history'}), 500
 
 @app.route('/stats', methods=['GET'])
-@jwt_required()
+@custom_jwt_required
 def get_stats():
     """Get user statistics"""
     try:
-        user_id = int(get_jwt_identity())
+        user_id = request.current_user_id
         stats = db_manager.get_user_stats(user_id)
         
         return jsonify({
@@ -726,7 +775,7 @@ def reset_password():
         return jsonify({'error': 'Password reset failed'}), 500
 
 @app.route('/retrain', methods=['POST'])
-@jwt_required()
+@custom_jwt_required
 @rate_limit(max_requests=5, window=300)
 def retrain_model():
     """Retrain the spam detection model with new data"""
@@ -767,16 +816,15 @@ def retrain_model():
         return jsonify({'error': 'Model retraining failed'}), 500
 
 @app.route('/verify-token', methods=['GET'])
-@jwt_required()
+@custom_jwt_required
 def verify_token():
     """Verify JWT token and return user information"""
     try:
-        # Get current user ID from JWT token (as string, convert to int)
-        current_user_id_str = get_jwt_identity()
-        current_user_id = int(current_user_id_str)
+        # Get current user ID from custom JWT decorator
+        current_user_id = request.current_user_id
         
         # Get user information
-        user = db.get_user_by_id(current_user_id)
+        user = db_manager.get_user_by_id(current_user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
             
