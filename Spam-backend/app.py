@@ -764,39 +764,27 @@ def retrain_model():
         return jsonify({'error': 'Model retraining failed'}), 500
 
 @app.route('/verify-token', methods=['GET'])
-@require_auth
+@jwt_required()
 def verify_token():
     """Verify JWT token and return user information"""
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return jsonify({'error': 'Invalid token format'}), 401
-            
-        token = auth_header.split(' ')[1]
+        # Get current user ID from JWT token
+        current_user_id = get_jwt_identity()
         
-        try:
-            payload = jwt.decode(token, config.JWT_SECRET_KEY, algorithms=['HS256'])
-            user_id = payload['user_id']
+        # Get user information
+        user = db.get_user_by_id(current_user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
             
-            # Get user information
-            user = db.get_user_by_id(user_id)
-            if not user:
-                return jsonify({'error': 'User not found'}), 404
-                
-            return jsonify({
-                'valid': True,
-                'user': {
-                    'id': user.id,
-                    'email': user.email,
-                    'created_at': user.created_at.isoformat()
-                }
-            })
-            
-        except jwt.ExpiredSignatureError:
-            return jsonify({'error': 'Token has expired'}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({'error': 'Invalid token'}), 401
-            
+        return jsonify({
+            'valid': True,
+            'user': {
+                'id': user['id'],
+                'email': user['email'],
+                'created_at': user['created_at'].isoformat()
+            }
+        })
+        
     except Exception as e:
         logger.error(f"Token verification error: {e}")
         return jsonify({'error': 'Token verification failed'}), 500
