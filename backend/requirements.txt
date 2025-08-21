@@ -12,4 +12,3 @@ pillow
 pytesseract
 opencv-python
 bcrypt
-psycopg2-binary

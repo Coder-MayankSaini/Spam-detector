@@ -1,0 +1,12 @@
+[build]
+builder = "NIXPACKS"
+
+[build.nixpacksConfig]
+nixPkgs = ["...", "python39", "nodejs_18"]
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+startCommand = "cd backend && python app.py"
+
+[environments.production.variables]
+RAILWAY_ENVIRONMENT = "production"
