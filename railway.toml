@@ -2,11 +2,13 @@
 builder = "NIXPACKS"
 
 [build.nixpacksConfig]
-nixPkgs = ["...", "python39", "nodejs_18"]
+nixPkgs = ["python39", "tesseract", "poppler_utils", "imagemagick"]
 
 [deploy]
 restartPolicyType = "ON_FAILURE"
-startCommand = "cd backend && python app.py"
+startCommand = "gunicorn app_production:app --bind 0.0.0.0:$PORT --workers 2 --timeout 60 --preload"
 
 [environments.production.variables]
 RAILWAY_ENVIRONMENT = "production"
+PYTHONUNBUFFERED = "1"
+TESSERACT_PATH = "/nix/store/*-tesseract-*/bin/tesseract"

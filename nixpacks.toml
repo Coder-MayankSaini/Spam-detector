@@ -1,0 +1,26 @@
+providers = ["python"]
+
+[phases.setup]
+nixPkgs = [
+  "python39",
+  "tesseract",
+  "poppler_utils",
+  "imagemagick",
+  "libgl1-mesa-glx",
+  "libglib2.0-0"
+]
+
+[phases.install]
+cmds = [
+  "pip install --upgrade pip",
+  "pip install -r requirements.txt"
+]
+
+[phases.build]
+cmds = [
+  "python -c 'import nltk; nltk.download(\"punkt\"); nltk.download(\"stopwords\"); nltk.download(\"wordnet\")'",
+  "python -c 'import sklearn; print(\"Scikit-learn version:\", sklearn.__version__)'"
+]
+
+[start]
+cmd = "gunicorn app_production:app --bind 0.0.0.0:$PORT --workers 2 --timeout 60 --preload"
