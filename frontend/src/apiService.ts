@@ -59,20 +59,34 @@ class ApiService {
   }
 
   async getHistory(): Promise<HistoryItem[]> {
+    console.log('Fetching history from:', `${API_BASE}/history`);
+    const headers = authService.getAuthHeaders();
+    console.log('Auth headers:', headers);
+    
     const response = await fetch(`${API_BASE}/history`, {
-      headers: authService.getAuthHeaders()
+      headers
     });
     
+    console.log('History response status:', response.status);
+    
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('History API error:', errorText);
+      
       if (response.status === 401) {
         authService.logout();
         window.location.reload();
         return Promise.reject(new Error('Session expired. Please login again.'));
       }
-      throw new Error('Failed to fetch history');
+      if (response.status === 422) {
+        return Promise.reject(new Error('Invalid request. Please try logging in again.'));
+      }
+      throw new Error(`Failed to fetch history: ${response.status} ${errorText}`);
     }
     
     const data = await response.json();
+    console.log('History data received:', data);
+    
     // Map backend response to frontend interface
     const mappedData = Array.isArray(data) ? data.map(item => ({
       ...item,
