@@ -34,7 +34,10 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 def init_db():
     """Initialize SQLite database"""
     try:
-        conn = sqlite3.connect('emails.db')
+        # Ensure the database directory exists
+        db_path = os.path.join(os.getcwd(), 'emails.db')
+        
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         # Create users table
@@ -63,9 +66,11 @@ def init_db():
         
         conn.commit()
         conn.close()
-        logger.info("Database initialized successfully")
+        logger.info(f"Database initialized successfully at {db_path}")
+        return True
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
+        return False
 
 def hash_password(password):
     """Hash password using hashlib (fallback when bcrypt unavailable)"""
@@ -184,7 +189,8 @@ def register():
         password_hash = hash_password(password)
         
         # Store user
-        conn = sqlite3.connect('emails.db')
+        db_path = os.path.join(os.getcwd(), 'emails.db')
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         try:
@@ -224,7 +230,8 @@ def login():
         username = data['username'].strip()
         password = data['password']
         
-        conn = sqlite3.connect('emails.db')
+        db_path = os.path.join(os.getcwd(), 'emails.db')
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         cursor.execute(
@@ -267,7 +274,8 @@ def analyze_email():
         is_spam, confidence = rule_based_spam_detection(text)
         
         # Store analysis result
-        conn = sqlite3.connect('emails.db')
+        db_path = os.path.join(os.getcwd(), 'emails.db')
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         cursor.execute(
@@ -293,7 +301,8 @@ def analyze_email():
 def get_history():
     """Get user's analysis history"""
     try:
-        conn = sqlite3.connect('emails.db')
+        db_path = os.path.join(os.getcwd(), 'emails.db')
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         cursor.execute(
@@ -345,3 +354,6 @@ if __name__ == '__main__':
     
     # Run the app
     app.run(host='0.0.0.0', port=port, debug=False)
+else:
+    # Initialize database when imported (for gunicorn)
+    init_db()
