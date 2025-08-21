@@ -1,15 +1,5 @@
 providers = ["python"]
 
-[phases.setup]
-nixPkgs = [
-  "python39",
-  "tesseract",
-  "poppler_utils",
-  "imagemagick",
-  "libgl1-mesa-glx",
-  "libglib2.0-0"
-]
-
 [phases.install]
 cmds = [
   "pip install --upgrade pip",
