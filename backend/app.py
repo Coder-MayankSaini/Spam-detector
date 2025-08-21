@@ -61,11 +61,11 @@ class Config:
     HOST = os.getenv('HOST', '0.0.0.0')
     
     # Email configuration
-    EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
-    EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-    EMAIL_USER = os.getenv('EMAIL_USER')
-    EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
-    EMAIL_FROM = os.getenv('EMAIL_FROM', os.getenv('EMAIL_USER'))
+    EMAIL_HOST = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.getenv('SMTP_PORT', 587))
+    EMAIL_USER = os.getenv('SMTP_USERNAME')
+    EMAIL_PASSWORD = os.getenv('SMTP_PASSWORD')
+    EMAIL_FROM = os.getenv('SMTP_USERNAME')
     
     # OCR configuration
     TESSERACT_PATH = os.getenv('TESSERACT_PATH', '/usr/bin/tesseract')
@@ -381,6 +381,126 @@ def send_password_reset_email(email, reset_token):
         logger.error(f"Error sending password reset email: {e}")
         return False
 
+def send_contact_email(name, email, message):
+    """Send contact form email notification"""
+    try:
+        if not config.EMAIL_USER or not config.EMAIL_PASSWORD:
+            logger.error("Email configuration missing")
+            return False
+        
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f"New Contact Form Message from {name} - Spam Detector"
+        msg['From'] = config.EMAIL_FROM
+        msg['To'] = config.EMAIL_USER  # Send to your own email
+        
+        # HTML email template
+        html_template = f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>New Contact Message - Spam Detector</title>
+            <style>
+                body {{
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }}
+                .container {{
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    padding: 40px;
+                    border-radius: 15px;
+                    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+                }}
+                .content {{
+                    background: white;
+                    padding: 30px;
+                    border-radius: 10px;
+                    margin-top: 20px;
+                }}
+                .header {{
+                    text-align: center;
+                    color: white;
+                    margin-bottom: 20px;
+                }}
+                .field {{
+                    margin-bottom: 15px;
+                    padding: 10px;
+                    background: #f8f9fa;
+                    border-radius: 5px;
+                    border-left: 4px solid #667eea;
+                }}
+                .field-label {{
+                    font-weight: bold;
+                    color: #667eea;
+                    margin-bottom: 5px;
+                }}
+                .message-content {{
+                    background: #fff;
+                    padding: 15px;
+                    border-radius: 5px;
+                    border: 1px solid #e9ecef;
+                    white-space: pre-wrap;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🛡️ New Contact Message</h1>
+                    <p>SpamApp Contact Form Submission</p>
+                </div>
+                
+                <div class="content">
+                    <div class="field">
+                        <div class="field-label">👤 Name:</div>
+                        <div>{name}</div>
+                    </div>
+                    
+                    <div class="field">
+                        <div class="field-label">📧 Email:</div>
+                        <div>{email}</div>
+                    </div>
+                    
+                    <div class="field">
+                        <div class="field-label">💬 Message:</div>
+                        <div class="message-content">{message}</div>
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef;">
+                        <p style="color: #666; font-size: 14px;">
+                            📅 Received: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}<br>
+                            🌐 SpamApp - Advanced Email Security Platform
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Attach HTML content
+        html_part = MIMEText(html_template, 'html')
+        msg.attach(html_part)
+        
+        # Send email
+        with smtplib.SMTP(config.EMAIL_HOST, config.EMAIL_PORT) as server:
+            server.starttls()
+            server.login(config.EMAIL_USER, config.EMAIL_PASSWORD)
+            server.send_message(msg)
+        
+        logger.info(f"Contact form email sent from {email}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error sending contact form email: {e}")
+        return False
+
 # Routes
 
 @app.route('/health', methods=['GET'])
@@ -658,7 +778,15 @@ def contact():
         # Save contact message
         db_manager.save_contact_message(name, email, message)
         
-        return jsonify({'message': 'Thank you for your message! We will get back to you soon.'})
+        # Send email notification
+        email_sent = send_contact_email(name, email, message)
+        if not email_sent:
+            logger.warning(f"Failed to send email notification for contact from {email}")
+        
+        return jsonify({
+            'message': 'Thank you for your message! We will get back to you soon.',
+            'email_sent': email_sent
+        })
         
     except Exception as e:
         logger.error(f"Contact form error: {e}")
