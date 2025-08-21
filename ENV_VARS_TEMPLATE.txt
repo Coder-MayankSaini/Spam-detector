@@ -1,0 +1,36 @@
+# 🔑 Environment Variables for Railway
+
+Copy these to Railway dashboard → Your Backend Service → Variables tab
+
+## Required Variables:
+
+JWT_SECRET_KEY=generate-a-long-random-secret-key-here-use-256-bits-minimum
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your-16-character-gmail-app-password
+EMAIL_FROM=your-email@gmail.com
+CORS_ORIGINS=http://localhost:3000
+DEBUG=false
+
+## After Vercel Deployment, Update CORS_ORIGINS to:
+CORS_ORIGINS=https://your-app.vercel.app,http://localhost:3000
+
+---
+
+# 🔑 Environment Variables for Vercel
+
+Add this in Vercel dashboard → Your Project → Settings → Environment Variables
+
+## Required Variable:
+
+REACT_APP_API_BASE_URL=https://your-app.railway.app
+
+---
+
+# 📝 Notes:
+
+1. JWT_SECRET_KEY: Generate random key at https://generate-secret.now.sh/32
+2. EMAIL_PASSWORD: Gmail App Password (16 chars), NOT your regular Gmail password
+3. Replace "your-app" with your actual deployment URLs
+4. DATABASE_URL: Automatically provided by Railway - don't set manually!

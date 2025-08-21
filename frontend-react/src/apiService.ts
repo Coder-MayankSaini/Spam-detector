@@ -1,7 +1,8 @@
 import { EmailAnalysis, HistoryItem, Stats, TrainingItem } from './types';
 import { authService } from './authService';
 
-const API_BASE = 'http://localhost:5001';
+// Use environment variable for API base URL, fallback to localhost for development
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001';
 
 class ApiService {
   async analyzeEmail(emailText: string): Promise<EmailAnalysis> {

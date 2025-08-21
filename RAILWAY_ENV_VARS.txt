@@ -1,0 +1,14 @@
+# Railway Environment Variables Template
+# Copy these to your Railway project dashboard
+
+JWT_SECRET_KEY=your-256-bit-secret-key-here-change-me
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your-16-character-app-password
+EMAIL_FROM=your-email@gmail.com
+CORS_ORIGINS=https://your-app.vercel.app,http://localhost:3000
+DEBUG=false
+
+# DATABASE_URL is automatically provided by Railway PostgreSQL service
+# No need to set this manually - Railway handles it automatically!
