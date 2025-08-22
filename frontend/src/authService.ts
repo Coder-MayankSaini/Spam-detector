@@ -20,7 +20,8 @@ interface RegisterRequest {
 }
 
 class AuthService {
-  private baseUrl = process.env.REACT_APP_API_URL || 'https://web-production-02077.up.railway.app';
+  // Use local backend for testing - change this back to Railway URL once fixed
+  private baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
   private tokenKey = 'spamwall_token';
 
   async register(data: RegisterRequest): Promise<AuthResponse> {
